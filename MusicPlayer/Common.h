@@ -1,31 +1,28 @@
-﻿//************************************************************
+//************************************************************
 //		本文件为全局变量、宏、枚举类型和全局函数的定义
 //************************************************************
 #pragma once
-#include<conio.h >
+#include <ncursesw/curses.h>
 #include <vector>
-#include <io.h>
-#include<string>
-#include<Windows.h>
+#include <dirent.h>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <string>
+#include <locale>
+#include <codecvt>
+#include <string.h>
+
+#include "ini.h"
+
 using std::string;
-using std::wstring;
 using std::vector;
 
 #include "bass.h"
 
-#define UP_KEY (-1)			//定义上方向键
-#define DOWN_KEY (-2)		//定义下方向键
-#define LEFT_KEY (-3)		//定义左方向键
-#define RIGHT_KEY (-4)		//定义右方向键
-#define ESC_KEY 27
-#define SPACE_KEY ' '
-#define ENTER_KEY 13
 #define NEXT (-999)		//定义“下一曲”常量
 #define PREVIOUS (-998)		//定义“上一曲”常量
 
-//#define PROGRESS_BAR_LEN 67		//定义进度条占用的字符数
-//#define SONG_NAME_LEN 50		//定义歌曲标题显示的字符数
-//#define LYRIC_LEN 80		//定义歌词显示的字符数
 #define LYRIC_REFRESH 100		//定义歌词刷新的间隔时间（毫秒）
 
 #define MIN_WIDTH 40		//定义控制台窗口的最小宽度
@@ -35,11 +32,7 @@ using std::vector;
 
 #define MAX_NUM_LENGTH 80		//定义获取音频文件长度数量的最大值
 
-const wchar_t* VERSION = L"1.36";	//程序版本
-//const char* INI_PATH = ".\\config.ini";		//配置文件路径
-//const wchar_t* INI_PATH_W = L".\\config.ini";	//配置文件路径（宽字符）
-//const char* RECENT_FILE_PATH = ".\\recent_path.dat";	//最近播放路径文件的路径
-//const wchar_t* RECENT_FILE_PATH_W = L".\\recent_path.dat";	//最近播放路径文件的路径（宽字符）
+const char* VERSION = "1.36";	//程序版本
 
 enum class Command
 {
@@ -74,13 +67,6 @@ enum Color
 	PURPLE,
 	YELLOW,
 	WHITE
-};
-
-enum class CodeType
-{
-	ANSI,
-	UTF8,
-	UTF8_NO_BOM
 };
 
 struct Time
@@ -138,210 +124,130 @@ int operator-(Time time1, Time time2)
 	return (time1.min - time2.min) * 60000 + (time1.sec - time2.sec) * 1000 + (time1.msec - time2.msec);
 }
 
-//为SYSTEMTIME结构重载减号运算符，在确保a>b的情况下返回两个时间差的毫秒数，但是返回的值不会超过3000毫秒
-int operator-(SYSTEMTIME a, SYSTEMTIME b)
-{
-	if (a.wSecond == b.wSecond)
-		return a.wMilliseconds - b.wMilliseconds;
-	else if (a.wSecond - b.wSecond == 1 || a.wSecond - b.wSecond == -59)
-		return a.wMilliseconds - b.wMilliseconds + 1000;
-	else
-		return a.wMilliseconds - b.wMilliseconds + 2000;
+void InitColors(){
+	// 	BLACK = 0,
+	// DARK_BLUE  = 1,
+	// DARK_GREEN  = 2,
+	// DARK_CYAN  = 3,
+	// DARK_RED  = 4,
+	// DARK_PURPLE  = 5,
+	// DARK_YELLOW  = 6,
+	// DARK_WHITE  = 7,
+	// GRAY  = 8,
+	// BLUE  = 9,
+	// GREEN  = 10,
+	// CYAN  = 11,
+	// RED  = 12,
+	// PURPLE  = 13,
+	// YELLOW  = 14,
+	// WHITE  = 15
+	start_color();
+	use_default_colors();
+	init_pair(0, COLOR_BLACK, -1);
+	init_pair(1, COLOR_BLUE, -1);
+	init_pair(2, COLOR_GREEN, -1);
+	init_pair(3, COLOR_CYAN, -1);
+	init_pair(4, COLOR_RED, -1);
+	init_pair(5, COLOR_BLUE, -1);
+	init_pair(6, COLOR_YELLOW, -1);
+	init_pair(7, COLOR_WHITE, -1);
 }
 
+int kbhit(void)
+{
+    int ch = getch();
+
+    if (ch != ERR) {
+        ungetch(ch);
+        return 1;
+    } else {
+        return 0;
+    }
+}
 
 //获取一个键盘输入按键并将其返回
 int GetKey()
 {
-	int key{ _getch() };
-	if (key == 0xE0/* || key == 0*/)		//如果获得的按键值为0x0E或0则表示按下了功能键
-	{	
-		int key1 = _getch();		//按下了功能键需要再次调用_getch函数
-		switch (key1)
-		{
-			case 72: key = UP_KEY; break;
-			case 80: key = DOWN_KEY; break;
-			case 75: key = LEFT_KEY; break;
-			case 77: key = RIGHT_KEY; break;
-			default: key = key1; break;
-		}
-	}
+	int key{ getch() };
 	if (key >= 'a' && key <= 'z')		//如果按的是小写字母，则自动转换成大写字母
 		key -= 32;
 	return key;
 }
 
-//获取path路径下的指定格式的文件的文件名，并保存在files容器中。format容器中储存着要获取的文件格式。最多只获取max_files个文件。
-void GetAllFormatFiles(wstring path, vector<wstring>& files, const vector<wstring>& format, size_t max_file = 99999)
+static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+
+// convert string to wstring
+inline std::wstring to_wide_string(const std::string& input)
 {
-	//文件句柄 
-    intptr_t hFile = 0;
-	//文件信息（用Unicode保存使用_wfinddata_t，多字节字符集使用_finddata_t）
-	_wfinddata_t fileinfo;
-	wstring file_path;
-	for (auto a_format : format)
-	{
-		if ((hFile = _wfindfirst(file_path.assign(path).append(L"\\*.").append(a_format).c_str(), &fileinfo)) != -1)
-		{
-			do
-			{
-				if (files.size() >= max_file) break;
-				files.push_back(file_path.assign(fileinfo.name));  //将文件名保存
-			} while (_wfindnext(hFile, &fileinfo) == 0);
-		}
-		_findclose(hFile);
-	}
+	return converter.from_bytes(input);
+}
+// convert wstring to string 
+inline std::string to_byte_string(const std::wstring& input)
+{
+	return converter.to_bytes(input);
 }
 
-bool FileExist(const wstring& file)
+int GetRealPrintLength(const string &str){
+	auto wstr = to_wide_string(str);
+	int full_count = 0;
+	for(auto &wc : wstr){
+		if(wc < 0 || wc >= 128)
+			full_count += 1;
+	}
+	return wstr.length() + full_count;
+}
+
+int GetRealPrintLength(const char *str){
+	return GetRealPrintLength(string{str});
+}
+
+bool EndWith(const std::string &full, const std::string &suffix) {
+    return !suffix.empty() && full.length() > suffix.length()
+           && 0 == full.compare(full.length() - suffix.length(), suffix.length(), suffix);
+}
+
+//获取path路径下的指定格式的文件的文件名，并保存在files容器中。format容器中储存着要获取的文件格式。最多只获取max_files个文件。
+void GetAllFormatFiles(string path, vector<string>& files, const vector<string>& format, size_t max_file = 99999)
 {
-	int hFile = 0;
-	_wfinddata_t fileinfo;
-	return ((hFile = _wfindfirst(file.c_str(), &fileinfo)) != -1);
+
+	DIR                     *dir;
+    struct dirent           *diread;
+
+    if ((dir = opendir(path.c_str())) != nullptr) {
+        while ((diread = readdir(dir)) != nullptr) {
+			if (files.size() >= max_file) break;
+
+			auto file_path = string{diread->d_name};
+            if (diread->d_type == DT_REG && 
+				std::any_of(format.begin(), format.end(), [&file_path](const string &fmt){
+					return EndWith(file_path, fmt);
+				})
+			) {
+                files.push_back(diread->d_name);
+            }
+        }
+        closedir(dir);
+    }
+}
+
+bool FileExist(const string& file)
+{
+	return access(file.c_str(), F_OK) == 0;
 }
 
 //判断文件类型是否为midi音乐
-bool FileIsMidi(const wstring& file_name)
+bool FileIsMidi(const string& file_name)
 {
 	size_t length{ file_name.size() };
-	return (file_name.substr(length - 4, 4) == L".mid" || file_name.substr(length - 5, 5) == L".midi");
+	return (file_name.substr(length - 4, 4) == ".mid" || file_name.substr(length - 5, 5) == ".midi");
 }
 
-//向ini文件写入一个int数据
-inline void WritePrivateProfileIntW(const wchar_t* AppName, const wchar_t* KeyName, int value, const wchar_t* Path)
+string GetExePath()
 {
-	wchar_t buff[11];
-	_itow_s(value, buff, 10);
-	WritePrivateProfileStringW(AppName, KeyName, buff, Path);
-}
+	char result[ PATH_MAX ];
+    ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+    std::string appPath = std::string( result, (count > 0) ? count : 0 );
 
-//将一个UTF8编码的字符串转换成ANSI编码
-//int Utf8ToAnsi(const char *pstrUTF8, char *pstrAnsi)
-//{
-//	int i = 0;
-//	int j = 0;
-//	wchar_t strUnicode[200] = { 0 };
-//	i = MultiByteToWideChar(CP_UTF8, 0, pstrUTF8, -1, NULL, 0);
-//	memset(strUnicode, 0, i);
-//	MultiByteToWideChar(CP_UTF8, 0, pstrUTF8, -1, strUnicode, i);
-//	j = WideCharToMultiByte(CP_ACP, 0, strUnicode, -1, NULL, 0, NULL, NULL);
-//	WideCharToMultiByte(CP_ACP, 0, strUnicode, -1, pstrAnsi, j, NULL, NULL);
-//	return 0;
-//}
-
-//将string类型的字符串转换成Unicode编码的wstring字符串
-wstring StrToUnicode(const string& str, CodeType code_type)
-{
-	wstring result;
-	int size{ 0 };
-	if (code_type == CodeType::ANSI)
-	{
-		size = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, NULL, 0);
-		if (size <= 0) return wstring();
-		wchar_t* str_unicode = new wchar_t[size + 1];
-		MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, str_unicode, size);
-		result.assign(str_unicode);
-		delete[] str_unicode;
-	}
-	else
-	{
-		string temp;
-		//如果前面有BOM，则去掉BOM
-		if (str.size() >= 3 && str[0] == -17 && str[1] == -69 && str[2] == -65)
-			temp = str.substr(3);
-		else
-			temp = str;
-		size = MultiByteToWideChar(CP_UTF8, 0, temp.c_str(), -1, NULL, 0);
-		if (size <= 0) return wstring();
-		wchar_t* str_unicode = new wchar_t[size + 1];
-		MultiByteToWideChar(CP_UTF8, 0, temp.c_str(), -1, str_unicode, size);
-		result.assign(str_unicode);
-		delete[] str_unicode;
-	}
-	return result;
-}
-
-//将Unicode编码的wstring字符串转换成string类型的字符串
-string UnicodeToStr(const wstring& wstr, CodeType code_type)
-{
-	if (wstr.empty()) return string();
-	string result;
-	int size{ 0 };
-	if (code_type == CodeType::ANSI)
-	{
-		size = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
-		if (size <= 0) return string();
-		char* str = new char[size + 1];
-		WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, str, size, NULL, NULL);
-		result.assign(str);
-		delete[] str;
-	}
-	else
-	{
-		result.clear();
-		if (code_type == CodeType::UTF8)
-		{
-			result.push_back(-17);
-			result.push_back(-69);
-			result.push_back(-65);
-		}
-		size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
-		if (size <= 0) return string();
-		char* str = new char[size + 1];
-		WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, str, size, NULL, NULL);
-		result.append(str);
-		delete[] str;
-	}
-	return result;
-}
-
-//判断一个字符串是否UTF8编码
-bool IsUTF8Bytes(const char* data)
-{
-	int charByteCounter = 1;  //计算当前正分析的字符应还有的字节数
-	unsigned char curByte; //当前分析的字节.
-	bool ascii = true;
-	for (int i = 0; i < strlen(data); i++)
-	{
-		curByte = static_cast<unsigned char>(data[i]);
-		if (charByteCounter == 1)
-		{
-			if (curByte >= 0x80)
-			{
-				ascii = false;
-				//判断当前
-				while (((curByte <<= 1) & 0x80) != 0)
-				{
-					charByteCounter++;
-				}
-				//标记位首位若为非0 则至少以2个1开始 如:110XXXXX...........1111110X 
-				if (charByteCounter == 1 || charByteCounter > 6)
-				{
-					return false;
-				}
-			}
-		}
-		else
-		{
-			//若是UTF-8 此时第一位必须为1
-			if ((curByte & 0xC0) != 0x80)
-			{
-				return false;
-			}
-			charByteCounter--;
-		}
-	}
-	if (ascii) return false;		//如果全是ASCII字符，返回false
-	else return true;
-}
-
-wstring GetExePath()
-{
-	wchar_t path[MAX_PATH];
-	GetModuleFileNameW(NULL, path, MAX_PATH);
-	size_t index;
-	wstring current_path{ path };
-	index = current_path.find_last_of(L'\\');
-	current_path = current_path.substr(0, index + 1);
-	return current_path;
+    std::size_t found = appPath.find_last_of("/");
+    return appPath.substr(0,found);
 }

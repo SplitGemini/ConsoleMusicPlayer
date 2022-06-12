@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <string>
+#include <utility>
 #include <locale>
 #include <codecvt>
 #include <string.h>
@@ -16,6 +17,7 @@
 #include "ini.h"
 
 using std::string;
+using std::wstring;
 using std::vector;
 
 #include "bass.h"
@@ -197,9 +199,15 @@ int GetRealPrintLength(const string &str){
 	return wstr.length() + full_count;
 }
 
-int GetRealPrintLength(const char *str){
-	return GetRealPrintLength(string{str});
+int GetRealPrintLength(const wstring &str){
+	int full_count = 0;
+	for(auto &wc : str){
+		if(wc < 0 || wc >= 128)
+			full_count += 1;
+	}
+	return str.length() + full_count;
 }
+
 
 bool EndWith(const std::string &full, const std::string &suffix) {
     return !suffix.empty() && full.length() > suffix.length()
@@ -207,13 +215,13 @@ bool EndWith(const std::string &full, const std::string &suffix) {
 }
 
 //获取path路径下的指定格式的文件的文件名，并保存在files容器中。format容器中储存着要获取的文件格式。最多只获取max_files个文件。
-void GetAllFormatFiles(string path, vector<string>& files, const vector<string>& format, size_t max_file = 99999)
+void GetAllFormatFiles(wstring path, vector<wstring>& files, const vector<string>& format, size_t max_file = 99999)
 {
 
 	DIR                     *dir;
     struct dirent           *diread;
 
-    if ((dir = opendir(path.c_str())) != nullptr) {
+    if ((dir = opendir(to_byte_string(path).c_str())) != nullptr) {
         while ((diread = readdir(dir)) != nullptr) {
 			if (files.size() >= max_file) break;
 
@@ -223,31 +231,31 @@ void GetAllFormatFiles(string path, vector<string>& files, const vector<string>&
 					return EndWith(file_path, fmt);
 				})
 			) {
-                files.push_back(diread->d_name);
+                files.push_back(to_wide_string(string{diread->d_name}));
             }
         }
         closedir(dir);
     }
 }
 
-bool FileExist(const string& file)
+bool FileExist(const wstring& file)
 {
-	return access(file.c_str(), F_OK) == 0;
+	return access(to_byte_string(file).c_str(), F_OK) == 0;
 }
 
 //判断文件类型是否为midi音乐
-bool FileIsMidi(const string& file_name)
+bool FileIsMidi(const wstring& file_name)
 {
 	size_t length{ file_name.size() };
-	return (file_name.substr(length - 4, 4) == ".mid" || file_name.substr(length - 5, 5) == ".midi");
+	return (file_name.substr(length - 4, 4) == L".mid" || file_name.substr(length - 5, 5) == L".midi");
 }
 
-string GetExePath()
+wstring GetExePath()
 {
 	char result[ PATH_MAX ];
     ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
     std::string appPath = std::string( result, (count > 0) ? count : 0 );
 
     std::size_t found = appPath.find_last_of("/");
-    return appPath.substr(0,found);
+    return to_wide_string(appPath.substr(0,found));
 }

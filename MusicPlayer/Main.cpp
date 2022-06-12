@@ -27,10 +27,9 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-		vector<string> files;
+		vector<wstring> files;
 		for (int i{ 1 }; i < argc; i++)
-			//files.push_back(StrToUnicode(string{ argv[i] }, CodeType::ANSI));
-			files.push_back(string{ argv[i] });
+			files.push_back(to_wide_string( string{ argv[i] }));
 		my_player.Create(files);
 		cmd_line_open = true;
 	}
@@ -100,6 +99,7 @@ int main(int argc, char* argv[])
 				my_player.SaveRecentPath();
 				goto end;
 			}
+			clear();
 			my_player.ShowInfo();
 			my_player.ShowProgressBar();
 			my_player.ShowLyrics(true);

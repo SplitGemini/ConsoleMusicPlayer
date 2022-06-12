@@ -10,6 +10,9 @@ project(Console-Music-Player VERSION 1.38.0 LANGUAGES CXX C)
 
 find_package(libbass REQUIRED PATHS ${CMAKE_SOURCE_DIR})
 
+set(CURSES_NEED_WIDE TRUE)
+find_package(Curses REQUIRED)
+
 # manually set source files
 set(sources 
     MusicPlayer/Common.h
@@ -36,7 +39,7 @@ target_include_directories(Console-Music-Player
 target_link_libraries(Console-Music-Player
     PRIVATE
         libbass
-        -lncursesw
+        ${CURSES_LIBRARIES}
 )
 
 install(TARGETS Console-Music-Player

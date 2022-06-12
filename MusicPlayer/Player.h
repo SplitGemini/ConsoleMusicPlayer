@@ -19,23 +19,23 @@
 
 using std::ofstream;
 using std::ifstream;
-using std::string;
+using std::wstring;
 using std::string;
 using std::vector;
 using std::deque;
 
-using PathInfo = std::tuple<string, int, int>;		//储存路径信息
+using PathInfo = std::tuple<wstring, int, int>;		//储存路径信息
 const size_t PATH{ 0 }, TRACK{ 1 }, POSITION{ 2 };		//定义用于表示tuple<>对象中的3个字段的常量
 
 class CPlayer
 {
 private:
 	HSTREAM m_musicStream;
-	vector<string> m_playlist;		//播放列表，储存音乐文件的文件名
+	vector<wstring> m_playlist;		//播放列表，储存音乐文件的文件名
 	vector<Time> m_all_song_length;		//储存每个音乐文件的长度
-	string m_path;		//当前播放文件的路径
-	string m_lyric_path;	//歌词文件夹的路径
-	string m_current_file_name;		//正在播放的文件名
+	wstring m_path;		//当前播放文件的路径
+	wstring m_lyric_path;	//歌词文件夹的路径
+	wstring m_current_file_name;		//正在播放的文件名
 	deque<PathInfo> m_recent_path;		//最近打开过的路径
 
 	Time m_song_length;		//正在播放的文件的长度
@@ -62,8 +62,8 @@ private:
 	char m_font[32];		//控制台字体（字体名称必须以宽字符表示）
 	int m_font_size;	//字体大小
 
-	string m_config_path;	//配置文件的路径
-	string m_recent_path_dat_path;	//"recent_path.dat"文件的路径
+	wstring m_config_path;	//配置文件的路径
+	wstring m_recent_path_dat_path;	//"recent_path.dat"文件的路径
 
 	vector<int> m_find_result;		//储存查找结果的歌曲序号
 
@@ -71,12 +71,12 @@ private:
 	void IniConsole();		//初始化控制台
 	void IniBASS();
 
-	void ChangePath(const string& path, int track = 0);		//改变当前路径
+	void ChangePath(const wstring& path, int track = 0);		//改变当前路径
 
 	void LoadRecentPath();		//从文件载入最近路径列表
 	void EmplaceCurrentPathToRecent();		//将当前路径插入到最近路径中
 
-	void FindFile(const string& key_word);		//根据参数中的关键字查找文件，将结果保存在m_find_result中
+	void FindFile(const wstring& key_word);		//根据参数中的关键字查找文件，将结果保存在m_find_result中
 
 public:
 	void SaveRecentPath() const;		//将最近路径列表保存到文件
@@ -84,7 +84,7 @@ public:
 public:
 	CPlayer();
 	void Create();		//构造CPlayer类
-	void Create(const vector<string>& files);	//构造CPlayer类
+	void Create(const vector<wstring>& files);	//构造CPlayer类
 	void MusicControl(Command command);		//控制音乐播放
 	bool SongIsOver() const;		//判断当前音乐是否播放完毕
 	void GetCurrentPosition();		//获取当前播放到的位置
@@ -126,8 +126,8 @@ public:
 
 inline CPlayer::CPlayer()
 {
-	m_config_path = GetExePath() + "/config.ini";
-	m_recent_path_dat_path = GetExePath() + "/recent_path.dat";
+	m_config_path = GetExePath() + L"/config.ini";
+	m_recent_path_dat_path = GetExePath() + L"/recent_path.dat";
 }
 
 inline void CPlayer::Create()
@@ -141,7 +141,7 @@ inline void CPlayer::Create()
 	SetTitle();		//用当前正在播放的歌曲名作为窗口标题
 }
 
-inline void CPlayer::Create(const vector<string>& files)
+inline void CPlayer::Create(const vector<wstring>& files)
 {
 	IniBASS();
 	LoadConfig();
@@ -205,8 +205,8 @@ void CPlayer::IniPlayList(bool cmd_para)
 
 	clear();
 	//获取播放列表中每一首歌曲的长度
-	char buff[128];
-	snprintf(buff, sizeof(buff), "找到%d首歌曲，正在生成播放列表，请稍候……", m_song_num);
+	wchar_t buff[128] = {0};
+	swprintf(buff, sizeof(buff), L"找到%d首歌曲，正在生成播放列表，请稍候……", m_song_num);
 	Printstring(buff, 0, 0, DARK_WHITE);
 	refresh();
 	m_all_song_length.clear();
@@ -221,8 +221,8 @@ void CPlayer::IniPlayList(bool cmd_para)
 	for (int i{ start }; i < m_song_num && count < MAX_NUM_LENGTH; i++, count++)
 	{
 		m_current_file_name = m_playlist[i];
-
-		m_musicStream = BASS_StreamCreateFile(FALSE, (m_path + m_current_file_name).c_str(), 0, 0, 0);
+		auto file_name = to_byte_string(m_path + m_current_file_name);
+		m_musicStream = BASS_StreamCreateFile(FALSE, file_name.c_str(), 0, 0, 0);
 		GetSongLength();
 		m_all_song_length[i] = m_song_length;
 		MusicControl(Command::CLOSE);
@@ -233,15 +233,15 @@ void CPlayer::IniPlayList(bool cmd_para)
 	m_song_length = {0,0,0};
 	//m_current_position = {0,0,0};
 	if (m_song_num==0)
-		m_current_file_name = "没有找到文件";
+		m_current_file_name = L"没有找到文件";
 	else
 		m_current_file_name = m_playlist[m_index];
 }
 
 void CPlayer::IniLyrics()
 {
-	string lyric_path{ m_path + m_current_file_name };		//得到路径+文件名的字符串
-	lyric_path.replace(lyric_path.size() - 3, 3, "lrc");		//将最后3个字符的扩展名替换成lrc
+	wstring lyric_path{ m_path + m_current_file_name };		//得到路径+文件名的字符串
+	lyric_path.replace(lyric_path.size() - 3, 3, L"lrc");		//将最后3个字符的扩展名替换成lrc
 	if (FileExist(lyric_path))
 	{
 		m_Lyrics = CLyrics{ lyric_path };
@@ -249,7 +249,7 @@ void CPlayer::IniLyrics()
 	else		//当前目录下没有对应的歌词文件时，就在m_lyric_path目录下寻找歌词文件
 	{
 		lyric_path = m_lyric_path + m_current_file_name;
-		lyric_path.replace(lyric_path.size() - 3, 3, "lrc");
+		lyric_path.replace(lyric_path.size() - 3, 3, L"lrc");
 		if(FileExist(lyric_path))
 			m_Lyrics = CLyrics{ lyric_path };
 		else
@@ -259,12 +259,13 @@ void CPlayer::IniLyrics()
 
 void CPlayer::MusicControl(Command command)
 {
-	//char buff[16];
+	string file_path;
 	switch (command)
 	{
 	case Command::OPEN: 
 		m_error_code = 0;
-		m_musicStream = BASS_StreamCreateFile(FALSE, (m_path + m_current_file_name).c_str(), 0, 0, 0);
+		file_path = to_byte_string(m_path + m_current_file_name);
+		m_musicStream = BASS_StreamCreateFile(FALSE, file_path.c_str(), 0, 0, 0);
 		GetSongLength();
 		if (m_song_num > 0) m_all_song_length[m_index] = m_song_length;		//打开文件后再次将获取的文件长度保存到m_all_song_length容器中
 		break;
@@ -391,26 +392,26 @@ void CPlayer::ShowInfo() const
 	int song_name_length{ m_width - 25 };		//歌曲标题显示的半角字符数
 	if (m_error_code || m_musicStream == 0)
 	{
-		Printstring("播放出错", 0, 0, WHITE);
+		Printstring(L"播放出错", 0, 0, WHITE);
 	}
 	else
 	{
 		switch (m_playing)
 		{
-		case 1: Printstring("已暂停  ", 0, 0, WHITE); break;
-		case 2: Printstring("正在播放", 0, 0, WHITE); break;
-		default: Printstring("已停止  ", 0, 0, WHITE); break;
+		case 1: Printstring(L"已暂停  ", 0, 0, WHITE); break;
+		case 2: Printstring(L"正在播放", 0, 0, WHITE); break;
+		default: Printstring(L"已停止  ", 0, 0, WHITE); break;
 		}
 	}
 	ClearString(14, 0, song_name_length);		//清除标题处的字符
 	//显示正在播放的歌曲序号
-	char buff[128];
-	snprintf(buff, sizeof(buff), "%.3d", m_index + 1);
+	wchar_t buff[128];
+	swprintf(buff, sizeof(buff), L"%.3d", m_index + 1);
 	Printstring(buff, 10, 0, DARK_CYAN);
 	//显示正在播放的歌曲名称
-	string temp;
+	wstring temp;
 	static int name_start{ 0 };
-	static string last_file_name;
+	static wstring last_file_name;
 	if (m_current_file_name != last_file_name)		//如果正在播放的歌曲发生了切换，就要把name_start清零
 	{
 		name_start = 0;
@@ -428,24 +429,27 @@ void CPlayer::ShowInfo() const
 			name_start = 0;
 		Printstring(temp.c_str(), 14, 0, song_name_length, CYAN);
 	}
-	
-	Printstring("音量：",m_width - 9, 0, RED);
+	swprintf(buff, sizeof(buff), L"音量：%d", m_volume);
 	ClearString(m_width - 3, 0, 3);
-	PrintInt(m_volume, m_width - 3, 0, RED);
+	Printstring(buff, m_width - GetRealPrintLength(buff), 0, RED);
+
+	// Printstring(L"音量：",m_width - 9, 0, RED);
+	// ClearString(m_width - 3, 0, 3);
+	// PrintInt(m_volume, m_width - 3, 0, RED);
 	
-	Printstring("播放/暂停(空格) 停止(S) 上一曲(V) 下一曲(N) 快退/快进(<-->) 设置路径(T) 跳转(K) 音量(上下) 浏览文件(E) 查找(F) 退出(ESC)", 0, 1, m_width, YELLOW);
+	Printstring(L"播放/暂停(空格) 停止(S) 上一曲(V) 下一曲(N) 快退/快进(<-->) 设置路径(T) 跳转(K) 音量(上下) 浏览文件(E) 查找(F) 退出(Q)", 0, 1, m_width, YELLOW);
 	
-	Printstring("循环模式(M):", m_width - 20, 4, GREEN);
+	Printstring(L"循环模式(M):", m_width - 20, 4, GREEN);
 	switch (m_repeat_mode)
 	{
-	case 0: Printstring("顺序播放", m_width - 8, 4, GREEN); break;
-	case 1: Printstring("随机播放", m_width - 8, 4, GREEN); break;
-	case 2: Printstring("列表循环", m_width - 8, 4, GREEN); break;
-	case 3: Printstring("单曲循环", m_width - 8, 4, GREEN); break;
+	case 0: Printstring(L"顺序播放", m_width - 8, 4, GREEN); break;
+	case 1: Printstring(L"随机播放", m_width - 8, 4, GREEN); break;
+	case 2: Printstring(L"列表循环", m_width - 8, 4, GREEN); break;
+	case 3: Printstring(L"单曲循环", m_width - 8, 4, GREEN); break;
 	default: break;
 	}
 
-	snprintf(buff, sizeof(buff), "MusicPlayer V%s 作者：ZY", VERSION);
+	swprintf(buff, sizeof(buff), L"MusicPlayer V%s 作者：ZY", VERSION);
 	Printstring(buff, 0, m_hight - 1,m_width - 37, GRAY);
 }
 
@@ -454,7 +458,7 @@ void CPlayer::ShowProgressBar() const
 	int pos;
 	int progress_bar_start{ 5 };
 	int progress_bar_length{ m_width - progress_bar_start - 13 };
-	string progress_bar(progress_bar_length, '-');		//生成用于表示进度条的由'-'组成的字符串
+	wstring progress_bar(progress_bar_length, L'-');		//生成用于表示进度条的由'-'组成的字符串
 	//GetCurrentPosition();
 	//GetSongLength();
 	if (m_song_length_int > 0)
@@ -462,18 +466,18 @@ void CPlayer::ShowProgressBar() const
 	else
 		pos = 0;
 	if (pos >= progress_bar_length) pos = progress_bar_length - 1;
-	progress_bar[pos] = '*';		//将进度条当前位置的字符替换成*
+	progress_bar[pos] = L'*';		//将进度条当前位置的字符替换成*
 	Printstring(progress_bar.c_str(), progress_bar_start, 2, pos + 1, PURPLE, DARK_PURPLE);
 
 	//显示>>>>
 	int i = m_current_position.sec % 4 + 1;
 
 	if (m_playing == 0) i = 0;
-	Printstring(">>>>", 0, 2, i, GREEN, GRAY);
+	Printstring(L">>>>", 0, 2, i, GREEN, GRAY);
 
 	//显示歌曲时间
-	char buff[15];
-	snprintf(buff, sizeof(buff)/2, "%d:%.2d/%d:%.2d", m_current_position.min, m_current_position.sec, m_song_length.min, m_song_length.sec);
+	wchar_t buff[15];
+	swprintf(buff, sizeof(buff), L"%d:%.2d/%d:%.2d", m_current_position.min, m_current_position.sec, m_song_length.min, m_song_length.sec);
 	ClearString(m_width - 12, 2, 12);
 	Printstring(buff, m_width - 12, 2, DARK_YELLOW);
 }
@@ -483,17 +487,17 @@ void CPlayer::ShowPlaylist() const
 	int x, y{ 4 }, playlist_width;
 	x = m_width < WIDTH_THRESHOLD ? 0 : (m_width / 2 + 1);
 	playlist_width = m_width < WIDTH_THRESHOLD ? m_width : (m_width / 2 - 1);
-	char buff[64];
-	Printstring("播放列表", x, y, GREEN);
-	snprintf(buff, sizeof(buff), "(共%d首)：", m_song_num);
+	wchar_t buff[64];
+	Printstring(L"播放列表", x, y, GREEN);
+	swprintf(buff, sizeof(buff), L"(共%d首)：", m_song_num);
 	Printstring(buff, x + 8, y, GREEN);
-	Printstring("当前路径：", x, y + 1, GRAY);
+	Printstring(L"当前路径：", x, y + 1, GRAY);
 	Printstring(m_path.c_str(), x + 10, y + 1, playlist_width - 10, GRAY);		//路径最多显示playlist_width - 10个字符
 	for (int i{ 0 }; i < m_song_per_page; i++)
 		ClearString(x, y + 2 + i, 2);
 
 	if (m_song_num > 0 && m_display_page == m_index / m_song_per_page + 1)		//如果显示的是正在播放歌曲所在页，就显示当前歌曲指示
-		Printstring("◆", x, y + 2 + m_index%m_song_per_page, CYAN);
+		Printstring(L"◆", x, y + 2 + m_index%m_song_per_page, CYAN);
 
 	for (int i{ 0 }; i < m_song_per_page; i++)
 	{
@@ -502,22 +506,22 @@ void CPlayer::ShowPlaylist() const
 		{
 			PrintInt(index + 1, x + 2, y + 2 + i, GRAY);		//输出序号
 			Printstring(m_playlist[index].c_str(), x + 6, y + 2 + i, playlist_width - 13, WHITE);		//输出文件名（最多只输出playlist_width - 13个字符）
-			snprintf(buff, sizeof(buff)/2, "%d:%.2d", m_all_song_length[index].min, m_all_song_length[index].sec);
+			swprintf(buff, sizeof(buff), L"%d:%.2d", m_all_song_length[index].min, m_all_song_length[index].sec);
 			if (m_all_song_length[index] > Time{0, 0, 0})
 				Printstring(buff, m_width - 6, y + 2 + i, DARK_YELLOW);		//输出音频文件长度
 			else
-				Printstring("-:--", m_width - 6, y + 2 + i, DARK_YELLOW);		//获取不到长度时显示-:--
+				Printstring(L"-:--", m_width - 6, y + 2 + i, DARK_YELLOW);		//获取不到长度时显示-:--
 		}
 	}
 	//Printstring("按[]翻页", m_width - 14, m_hight - 1, DARK_CYAN);
-	snprintf(buff, sizeof(buff), "按[]翻页 %d/%d", m_display_page, m_total_page);
+	swprintf(buff, sizeof(buff), L"按[]翻页 %d/%d", m_display_page, m_total_page);
 	Printstring(buff, m_total_page > 99 ? m_width - 16 : m_width - 14, m_hight - 1, DARK_CYAN);
 
 	if (!m_Lyrics.IsEmpty())
 	{
 		ClearString(m_width - 36, m_hight - 1, 19);
-		Printstring("歌词编码：", m_width - 36, m_hight - 1, GRAY);
-		Printstring("UTF8", m_width - 26, m_hight - 1, GRAY);
+		Printstring(L"歌词编码：", m_width - 36, m_hight - 1, GRAY);
+		Printstring(L"UTF8", m_width - 26, m_hight - 1, GRAY);
 	}
 }
 
@@ -533,14 +537,14 @@ void CPlayer::ShowLyricsSingleLine() const
 {
 	if (!m_Lyrics.IsEmpty())
 	{
-		static string last_lyric;
-		string current_lyric{ m_Lyrics.GetLyric(m_current_position, 0) };		//获取当前歌词
+		static wstring last_lyric;
+		wstring current_lyric{ m_Lyrics.GetLyric(m_current_position, 0) };		//获取当前歌词
 		if (current_lyric != last_lyric)
 		{
 			last_lyric = current_lyric;
 			ClearString(0, 3, m_width);				//只有当前歌词变了才要清除歌词显示区域
 		}
-		string temp;
+		wstring temp;
 		int lyric_progress{ static_cast<int>(m_Lyrics.GetLyricProgress(m_current_position)*(current_lyric.length() + 1) / 1000) };
 		/*lyric_progress为当前歌词的进度所在的字符数，根据GetLyricProgress函数获得的歌词进度和当前歌词的长度计算得到，
 		用于以卡拉OK形式显示歌词*/
@@ -553,7 +557,7 @@ void CPlayer::ShowLyricsSingleLine() const
 		}
 		else				//歌词文本超过指定的长度时滚动显示
 		{
-			current_lyric.append(" ");		//在歌词末尾加上一个空格，用于解决有时歌词最后一个字符无法显示的问题
+			current_lyric.append(L" ");		//在歌词末尾加上一个空格，用于解决有时歌词最后一个字符无法显示的问题
 			if (lyric_progress < m_width/2)		//当前歌词进度小于控制台宽度一半时，当前歌词从第0个字符开始显示
 			{
 				lrc_start = 0;
@@ -571,7 +575,7 @@ void CPlayer::ShowLyricsSingleLine() const
 		}
 	}
 	else
-		Printstring("当前歌曲没有歌词", m_width / 2 - 8, 3, DARK_CYAN);
+		Printstring(L"当前歌曲没有歌词", m_width / 2 - 8, 3, DARK_CYAN);
 }
 
 void CPlayer::ShowLyricsMultiLine(bool force_refresh) const
@@ -580,10 +584,10 @@ void CPlayer::ShowLyricsMultiLine(bool force_refresh) const
 	int lyric_width{ m_width / 2 - 1 };		//歌词显示的宽度
 	int lyric_hight{ m_hight - 6 };		//歌词显示的高度
 	int lyric_x;		//每一句歌词输出时的起始x坐标
-	string lyric_text;		//储存每一句歌词文本
-	auto lyric_length = GetRealPrintLength(lyric_text);
+	wstring lyric_text;		//储存每一句歌词文本
+	int lyric_length;
 	static bool lyric_change_flag{ true };
-	if(lyric_change_flag || force_refresh) Printstring("歌词秀：", x, y, GREEN);
+	if(lyric_change_flag || force_refresh) Printstring(L"歌词秀：", x, y, GREEN);
 	if (!m_Lyrics.IsEmpty())
 	{
 		static int last_lyric_index;
@@ -604,7 +608,8 @@ void CPlayer::ShowLyricsMultiLine(bool force_refresh) const
 		for (int i{ -lyric_hight / 2 + 1 }; i + lyric_hight / 2 <= lyric_hight; i++)
 		{
 			lyric_text = m_Lyrics.GetLyric(m_current_position, i);
-			if (lyric_text == "……") lyric_text.clear();		//多行模式下不显示省略号
+			if (lyric_text == L"……") lyric_text.clear();		//多行模式下不显示省略号
+			lyric_length = GetRealPrintLength(lyric_text);
 			lyric_x = lyric_width / 2 - lyric_length / 2;
 			if (lyric_x < 0) lyric_x = 0;
 			if (i != 0)		//不是当前歌词，以暗色显示
@@ -622,8 +627,8 @@ void CPlayer::ShowLyricsMultiLine(bool force_refresh) const
 				}
 				else		//当前歌词宽度大于歌词显示宽度时滚动显示
 				{
-					lyric_text.append(" ");		//在歌词末尾加上一个空格，用于解决有时歌词最后一个字符无法显示的问题
-					string temp;
+					lyric_text.append(L" ");		//在歌词末尾加上一个空格，用于解决有时歌词最后一个字符无法显示的问题
+					wstring temp;
 					if (lyric_progress < lyric_width / 2)		//当前歌词进度小于歌词显示宽度一半时，当前歌词从第0个字符开始显示
 					{
 						lrc_start = 0;
@@ -637,14 +642,14 @@ void CPlayer::ShowLyricsMultiLine(bool force_refresh) const
 					}
 					if (lrc_start < 0) lrc_start = 0;
 					
-					temp = to_byte_string(to_wide_string(lyric_text).substr(lrc_start, lyric_width));
+					temp = lyric_text.substr(lrc_start, lyric_width);
 					Printstring(temp.c_str(), lyric_x, y + lyric_hight / 2 + i, lyric_width, lyric_progress - lrc_start_half_width, CYAN, DARK_CYAN);
 				}
 			}
 		}
 	}
 	else
-		Printstring("当前歌曲没有歌词", lyric_width / 2 - 8, y + lyric_hight / 2, DARK_CYAN);
+		Printstring(L"当前歌曲没有歌词", lyric_width / 2 - 8, y + lyric_hight / 2, DARK_CYAN);
 }
 
 
@@ -662,11 +667,6 @@ void CPlayer::SwitchPlaylist(int operation)
 		if (m_display_page < 1)
 			m_display_page = m_total_page;
 	}
-	clear();
-	// ShowInfo();
-	// ShowProgressBar();
-	// ShowLyrics();
-	// ShowPlaylist();
 }
 
 int CPlayer::GetCurrentSecond()
@@ -740,12 +740,12 @@ bool CPlayer::PlayTrack(int song_track)
 	return false;
 }
 
-void CPlayer::ChangePath(const string& path, int track)
+void CPlayer::ChangePath(const wstring& path, int track)
 {
 	MusicControl(Command::CLOSE);
 	m_path = path;
-	if (m_path.empty() || (m_path.back() != '/'))		//如果输入的新路径为空或末尾没有斜杠，则在末尾加上一个
-		m_path.append(1, '/');
+	if (m_path.empty() || (m_path.back() != L'/'))		//如果输入的新路径为空或末尾没有斜杠，则在末尾加上一个
+		m_path.append(1, L'/');
 	m_playlist.clear();		//清空播放列表
 	m_index = track;
 	//初始化播放列表
@@ -769,41 +769,41 @@ void CPlayer::SetPath()
 {
 	const int x{ 0 }, y{ 4 };
 	int hight{ m_hight - 5 };
-	string path;
+	wstring path;
 	int item_select{ 0 };
 	int max_selection;
-	char buff[256];
+	wchar_t buff[256];
 	for (int i{ 0 }; i < hight; i++)
 		ClearString(0, 4 + i, m_width);
 
-	Printstring("设置路径", x, y, CYAN);
-	Printstring("当前路径：", x, y + 1, GRAY);
+	Printstring(L"设置路径", x, y, CYAN);
+	Printstring(L"当前路径：", x, y + 1, GRAY);
 	Printstring(m_path.c_str(), x + 10, y + 1, m_width - 10, GRAY);		//路径最多显示m_width - 10个字符
-	Printstring("帮助：方向键选择，回车键确定，D键删除选中的路径，ESC键返回。", x, m_hight - 2, GRAY);
+	Printstring(L"帮助：方向键选择，回车键确定，D键删除选中的路径，ESC键返回。", x, m_hight - 2, GRAY);
 	ClearString(m_width - 16, m_hight - 1, 16);		//清除右下角的“按[]翻页”
 	refresh();
 
 	while (true)
 	{
-		snprintf(buff, sizeof(buff), "共%d个", static_cast<int>(m_recent_path.size()));
+		swprintf(buff, sizeof(buff), L"共%d个", static_cast<int>(m_recent_path.size()));
 		Printstring(buff, 9, y, DARK_WHITE);
 		max_selection = m_recent_path.size() + 1;
 		if (max_selection > hight - 3) max_selection = hight - 3;
 		for (int i{ 0 }; i < max_selection; i++)
 		{
 			if (i == item_select)
-				Printstring("◆", x, y + 2 + i, CYAN);
+				Printstring(L"◆", x, y + 2 + i, CYAN);
 			else
 				ClearString(x, y + 2 + i, 2);
 			
 			if (i == 0)
 			{
-				Printstring("输入新路径", x + 2, y + 2 + i, YELLOW);
+				Printstring(L"输入新路径", x + 2, y + 2 + i, YELLOW);
 			}
 			else
 			{
 				PrintInt(i, x + 2, y + 2 + i, DARK_YELLOW);		//输出序号
-				snprintf(buff, sizeof(buff), "%s (播放到第%d首)", std::get<PATH>(m_recent_path[i - 1]).c_str(), std::get<TRACK>(m_recent_path[i - 1]) + 1);
+				swprintf(buff, sizeof(buff), L"%s (播放到第%d首)", std::get<PATH>(m_recent_path[i - 1]).c_str(), std::get<TRACK>(m_recent_path[i - 1]) + 1);
 				size_t path_length{ std::get<PATH>(m_recent_path[i - 1]).length()};	//路径字符串占的半角字符数
 				Printstring(buff, x + 5, y + 2 + i, m_width - 5, path_length, YELLOW, GRAY);
 			}
@@ -842,17 +842,19 @@ void CPlayer::SetPath()
 			{
 			case 0:		//选择第0项，输入一个新路径
 				echo();
+				nodelay(stdscr, FALSE);
 				CursorVisible(true);
+				ClearString(x + 10, y + 1, m_width - 10);
 				do
 				{
 					GotoXY(10, 5);
-					auto p = getnstr(buff, 256); //从键盘输入路径	
-					path.assign(buff);	
-					if(p == OK) break;
-					else usleep(20000);
-					//std::getline(std::cin, path);
-				}while (path.empty());
+					char b[256] = {0};
+					getnstr(b, 256);
+					if(b[0] == '\0') continue;
+					path.assign(to_wide_string(string{b}));
+				} while (path.empty());
 				noecho();
+				nodelay(stdscr, TRUE);
 				CursorVisible(false);
 				if (path.size() > 1)		//路径必须至少2个字符，如果只输入1个字符就忽略它
 				{
@@ -887,14 +889,31 @@ void CPlayer::SetPath()
 
 void CPlayer::SetTrack()
 {
-	int track;
-	Printstring("请输入要播放的歌曲序号（输入0取消）：", 0, 2, DARK_WHITE);
+	std::string track;
+	Printstring(L"请输入要播放的歌曲序号（输入0取消）：", 0, 2, DARK_WHITE);
 	GotoXY(37, 2);
 	CursorVisible(true);
+	echo();
+	nodelay(stdscr, FALSE);
 	refresh();
-	std::cin >> track;
+	do
+	{
+		GotoXY(10, 5);
+		char b[256] = {0};
+		getnstr(b, 256);
+		if(b[0] == '\0') continue;
+		track.assign(string{b});
+	} while (track.empty());
+	noecho();
+	nodelay(stdscr, TRUE);
 	CursorVisible(false);
-	PlayTrack(track - 1);
+	int track_num = 0;
+	try{
+		track_num = std::stoi(track);
+	}catch(...){
+
+	}
+	PlayTrack(track_num - 1);
 }
 
 void CPlayer::SetRepeatMode()
@@ -923,7 +942,7 @@ bool CPlayer::ErrorDispose()
 	m_error_code = BASS_ErrorGetCode();
 	if (m_song_num==0)
 	{
-		Printstring("当前路径下没有音频文件，请按任意键重新设置文件路径。", 0, 2, DARK_WHITE);
+		Printstring(L"当前路径下没有音频文件，请按任意键重新设置文件路径。", 0, 2, DARK_WHITE);
 		refresh();
 		getch();
 		if (!m_recent_path.empty() && m_path == std::get<PATH>(m_recent_path[0]))
@@ -934,15 +953,15 @@ bool CPlayer::ErrorDispose()
 	}
 	else if (m_musicStream == 0)
 	{
-		Printstring("当前文件无法播放", 0, 2, DARK_WHITE);
+		Printstring(L"当前文件无法播放", 0, 2, DARK_WHITE);
 		refresh();
 		return true;
 	}
 
 	else if (m_error_code)
 	{
-		char error_info[64];
-		snprintf(error_info, 64, "出现了错误：错误代码：%d", m_error_code);
+		wchar_t error_info[64];
+		swprintf(error_info, 64, L"出现了错误：错误代码：%d", m_error_code);
 		Printstring(error_info, 0, 2, DARK_WHITE);
 		refresh();
 	}
@@ -956,7 +975,7 @@ inline void CPlayer::SetTitle() const
 
 void CPlayer::SaveConfig() const
 {
-	mINI::INIFile file(m_config_path);
+	mINI::INIFile file(to_byte_string(m_config_path));
 	mINI::INIStructure ini;
 	file.read(ini);
 
@@ -964,7 +983,7 @@ void CPlayer::SaveConfig() const
 	ini["config"]["repeat_mode"] = std::to_string(m_repeat_mode);
 	ini["config"]["window_width"] = std::to_string(m_width);
 	ini["config"]["window_hight"] = std::to_string(m_hight);
-	ini["config"]["lyric_path"] = m_lyric_path;
+	ini["config"]["lyric_path"] =  to_byte_string(m_lyric_path);
 
 	file.generate(ini);
 }
@@ -976,11 +995,11 @@ void CPlayer::LoadConfig()
 		m_repeat_mode = 0;
 		m_width = 80;
 		m_hight = 25;
-		m_lyric_path = "./lyrics";
+		m_lyric_path = L"./lyrics";
 		return;
 	}
 
-	mINI::INIFile file(m_config_path);
+	mINI::INIFile file(to_byte_string(m_config_path));
 	mINI::INIStructure ini;
 	file.read(ini);
 	auto tmp_str = ini["config"]["volume"];
@@ -997,7 +1016,7 @@ void CPlayer::LoadConfig()
 	m_hight = tmp_str.empty() ? 25 : std::stoi(tmp_str);
 
 	tmp_str = ini["config"]["lyric_path"];
-	m_lyric_path = tmp_str.empty() ? "./lyrics/" : tmp_str;
+	m_lyric_path = tmp_str.empty() ? L"./lyrics/" :  to_wide_string(tmp_str);
 
 }
 
@@ -1020,105 +1039,112 @@ void CPlayer::Find()
 	int hight{ m_hight - 5 };
 	int item_select{ 0 };
 	int max_selection{ static_cast<int>(m_find_result.size()) };
-	char buff[256];
-	string key_word;
+	wchar_t buff[256];
+	wstring key_word;
 	bool find_flag{ false };	//执行过一次查找后，find_flag会被置为true
-	for (int i{ 0 }; i < hight; i++)
-		ClearString(0, 4 + i, m_width);
 
-	Printstring("查找文件", x, y, CYAN);
-	Printstring("请按空格键后输入要查找的关键词：", x, y + 1, DARK_WHITE);
+	
 	while (true)
-	{
+	{	
+		clear();
+		GetCurrentPosition();
+		Printstring(L"查找文件", x, y, CYAN);
+		Printstring(L"请按空格键后输入要查找的关键词：", x, y + 1, DARK_WHITE);
+		ShowInfo();
+		ShowProgressBar();
+		
 		max_selection = m_find_result.size();
 		if (max_selection > hight - 4) max_selection = hight - 4;
-		//清除显示查找结果区域的字符
-		for (int i{ 0 }; i < m_hight - 8; i++)
-			ClearString(x, y + 2 + i, m_width);
 
 		if (!m_find_result.empty())
 		{
 			if (find_flag)
 			{
-				Printstring("查找结果：", x, y + 2, GREEN);
-				snprintf(buff, sizeof(buff), "(共%d个结果)", static_cast<int>(m_find_result.size()));
+				Printstring(L"查找结果：", x, y + 2, GREEN);
+				swprintf(buff, sizeof(buff), L"(共%d个结果)", static_cast<int>(m_find_result.size()));
 				Printstring(buff, x + 10, y + 2, GRAY);
 			}
 			else
 			{
-				Printstring("上次的查找结果：", x, y + 2, GREEN);
-				snprintf(buff, sizeof(buff), "(共%d个结果)", static_cast<int>(m_find_result.size()));
+				Printstring(L"上次的查找结果：", x, y + 2, GREEN);
+				swprintf(buff, sizeof(buff), L"(共%d个结果)", static_cast<int>(m_find_result.size()));
 				Printstring(buff, x + 16, y + 2, GRAY);
 			}
 			for (int i{ 0 }; i < max_selection; i++)
 			{
 				if (i == item_select)
-					Printstring("◆", x, y + 3 + i, CYAN);
+					Printstring(L"◆", x, y + 3 + i, CYAN);
 				else
 					ClearString(x, y + 3 + i, 2);
 
 				//查找结果显示格式为：序号 文件名 (分/秒)
 				PrintInt(i + 1, x + 2, y + 3 + i, GRAY);
-				snprintf(buff, sizeof(buff), "%s (%d:%.2d)", m_playlist[m_find_result[i]].c_str(), m_all_song_length[m_find_result[i]].min, m_all_song_length[m_find_result[i]].sec);
+				// FIXME: c_str() 只能取到第一个字符，后面的都被 '\0' 切掉了
+				swprintf(buff, sizeof(buff), L"%s (%d:%.2d)", m_playlist[m_find_result[i]].c_str(), m_all_song_length[m_find_result[i]].min, m_all_song_length[m_find_result[i]].sec);
 				Printstring(buff, x + 5, y + 3 + i, m_width - 5, m_playlist[m_find_result[i]].length(), WHITE, DARK_YELLOW);
 			}
 		}
 		else if(find_flag)
 		{
-			Printstring("没有找到结果", x, y + 2, YELLOW);
+			Printstring(L"没有找到结果", x, y + 2, YELLOW);
 		}
 
-		Printstring("帮助：方向键选择查找结果，回车键播放，空格键开始查找，输入“*”取消查找。ESC键返回。", x, m_hight - 2, GRAY);
-		ClearString(m_width - 16, m_hight - 1, 16);
-		switch (GetKey())
-		{
-		case ' ':
-			ClearString(x + 32, y + 1, m_width - x - 32);	//输入前清除上次输入的字符
-			CursorVisible(true);
-			do
+		Printstring(L"帮助：方向键选择查找结果，回车键播放，空格键开始查找，输入“*”取消查找。Q键返回。", x, m_hight - 2, GRAY);
+		RemoveString(m_width - 16, m_hight - 1, 16);
+		refresh();
+		if(kbhit()){
+			switch (GetKey())
 			{
-				GotoXY(x + 32, y + 1);
-				getnstr(buff, 256);//从键盘输入关键词
-				key_word = buff;	
-			} while (key_word.empty());
-			CursorVisible(false);
-			if (key_word == "*")		//输入星号取消查找
+			case ' ':
+				RemoveString(x + 32, y + 1, m_width - x - 32);	//输入前清除上次输入的字符
+				CursorVisible(true);
+				echo();
+				nodelay(stdscr, FALSE);
+				do
+				{
+					GotoXY(x + 32, y + 1);
+					char b[256] = {0};
+					getnstr(b, 256);//从键盘输入关键词
+					if(b[0] == '\n') continue;
+					key_word.assign(to_wide_string(b));
+				} while (key_word.empty());
+				CursorVisible(false);
+				noecho();
+				nodelay(stdscr, TRUE);
+				if (key_word == L"*")		//输入星号取消查找
+					break;
+				find_flag = true;
+				m_find_result.clear();		//查找之前先清除上一次的查找结果
+				FindFile(key_word);
 				break;
-			find_flag = true;
-			m_find_result.clear();		//查找之前先清除上一次的查找结果
-			FindFile(key_word);
-			break;
-		case KEY_UP:
-			item_select--;
-			if (item_select < 0) item_select = max_selection - 1;
-			break;
-		case KEY_DOWN:
-			item_select++;
-			if (item_select >= max_selection) item_select = 0;
-			break;
-		case '\n':
-			if(!m_find_result.empty())
-				PlayTrack(m_find_result[item_select]);
-		case 'Q':
-			clear();
-			ShowInfo();
-			ShowProgressBar();
-			ShowLyrics();
-			ShowPlaylist();
-			return;
-		default:
-			break;
+			case KEY_UP:
+				item_select--;
+				if (item_select < 0) item_select = max_selection - 1;
+				break;
+			case KEY_DOWN:
+				item_select++;
+				if (item_select >= max_selection) item_select = 0;
+				break;
+			case '\n':
+				if(!m_find_result.empty())
+					PlayTrack(m_find_result[item_select]);
+			case 'Q':
+				return;
+			default:
+				break;
+			}
 		}
+		usleep(20000);
 	}
 }
 
-void CPlayer::FindFile(const string & key_word)
+void CPlayer::FindFile(const wstring & key_word)
 {
 	int index;
 	for (int i{ 0 }; i < m_playlist.size(); i++)
 	{
 		index = m_playlist[i].find(key_word);
-		if (index != string::npos)
+		if (index != wstring::npos)
 			m_find_result.push_back(i);
 	}
 }
@@ -1127,12 +1153,12 @@ void CPlayer::FindFile(const string & key_word)
 void CPlayer::SaveRecentPath() const
 {
 	//将最近文件列表保存到程序目录下的recent_path.dat中，其中每一行的格式为：路径<曲目序号,播放到的位置(毫秒)>
-	ofstream SaveFile{ m_recent_path_dat_path };
+	ofstream SaveFile{ to_byte_string(m_recent_path_dat_path) };
 
 	char buff_unicode[256];
 	for (auto& path_info : m_recent_path)
 	{
-		snprintf(buff_unicode, sizeof(buff_unicode), "%s<%.4d,%d>\n", std::get<PATH>(path_info).c_str(), std::get<TRACK>(path_info), std::get<POSITION>(path_info));
+		snprintf(buff_unicode, sizeof(buff_unicode), "%s<%.4d,%d>\n", to_byte_string(std::get<PATH>(path_info)).c_str(), std::get<TRACK>(path_info), std::get<POSITION>(path_info));
 		SaveFile <<  buff_unicode;		//以UTF8格式保存路径
 	}
 	SaveFile.close();
@@ -1140,7 +1166,7 @@ void CPlayer::SaveRecentPath() const
 
 void CPlayer::LoadRecentPath()
 {
-	ifstream OpenFile{ m_recent_path_dat_path };
+	ifstream OpenFile{ to_byte_string(m_recent_path_dat_path) };
 	if (!FileExist(m_recent_path_dat_path)) return;
 	while (!OpenFile.eof())
 	{
@@ -1150,8 +1176,7 @@ void CPlayer::LoadRecentPath()
 		char buff_unicode[256]{ 0 };
 		int index;
 		std::getline(OpenFile, current_line);		//读取文件中的每一行
-		if (current_line.size() >= 3 && (current_line[0] == -17 && current_line[1] == -69 && current_line[2] == -65))
-			current_line = current_line.substr(3);		//如果RecentPath文件的前面3个字节是UTF8文件的BOM，就把它们删除
+
 		index = current_line.find_first_of('<');
 		if (index == string::npos)	//没有找到'<'，说明文件中只保存了路径而没有保存曲目序号和位置
 		{
@@ -1163,14 +1188,14 @@ void CPlayer::LoadRecentPath()
 		{
 			path = current_line.substr(0, index);		//读取路径
 			temp = current_line.substr(index + 1, 4);	//读取曲目序号（固定4个字符）
-			track = atoi(temp.c_str());
+			track = std::stoi(temp);
 			temp = current_line.substr(index + 6, current_line.size() - index - 5);		//读取位置
-			position = atoi(temp.c_str());
+			position = std::stoi(temp);
 		}
 		if (path.empty() || path.size() < 2) continue;		//如果路径为空或路径太短，就忽略它
-		if (path.back() != '/')	//如果读取到的路径末尾没有斜杠，则在末尾加上一个
-			path.append(1, '/');
-		m_recent_path.push_back(std::make_tuple(path, track, position));
+		if (path.back() != L'/')	//如果读取到的路径末尾没有斜杠，则在末尾加上一个
+			path.append(1, L'/');
+		m_recent_path.push_back(std::make_tuple(to_wide_string(path), track, position));
 	}
 	OpenFile.close();
 
@@ -1178,8 +1203,8 @@ void CPlayer::LoadRecentPath()
 	if (!m_recent_path.empty())
 	{
 		m_path = std::get<PATH>(m_recent_path[0]);
-		if (!m_path.empty() && m_path.back() != '/')		//如果读取到的新路径末尾没有斜杠，则在末尾加上一个
-			m_path.push_back('/');
+		if (!m_path.empty() && m_path.back() != L'/')		//如果读取到的新路径末尾没有斜杠，则在末尾加上一个
+			m_path.push_back(L'/');
 
 		m_index = std::get<TRACK>(m_recent_path[0]);
 		m_current_position_int = std::get<POSITION>(m_recent_path[0]);
@@ -1187,7 +1212,7 @@ void CPlayer::LoadRecentPath()
 	}
 	else
 	{
-		m_path = "./songs/";		//默认的路径
+		m_path = L"./songs/";		//默认的路径
 	}
 
 }

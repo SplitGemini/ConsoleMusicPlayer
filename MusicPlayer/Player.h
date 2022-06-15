@@ -171,7 +171,7 @@ void CPlayer::IniConsole()
 inline void CPlayer::IniBASS()
 {
 	//初始化BASE音频库
-	BASS_Init(
+	if(!BASS_Init(
 		-1,//默认设备
 		44100,//输出采样率44100（常用值）
 		BASS_DEVICE_CPSPEAKERS,//信号，BASS_DEVICE_CPSPEAKERS 注释原文如下：
@@ -181,7 +181,8 @@ inline void CPlayer::IniBASS()
 							   /* This flag has no effect on Vista, as the speakers are already accurately detected.*/
 		NULL,//程序窗口,0用于控制台程序
 		NULL//类标识符,0使用默认值
-	);
+	))
+		throw std::runtime_error("Init Bass fail, check your have libasound2 installed.");
 }
 
 void CPlayer::IniPlayList(bool cmd_para)
@@ -961,7 +962,9 @@ bool CPlayer::ErrorDispose()
 	}
 	else if (m_musicStream == 0)
 	{
-		Printstring(L"当前文件无法播放", 0, 2, DARK_WHITE);
+		wchar_t error_info[64];
+		swprintf(error_info, 64, L"当前文件无法播放：错误代码：%d", m_error_code);
+		Printstring(error_info, 0, 2, DARK_WHITE);
 		refresh();
 		return true;
 	}

@@ -189,16 +189,6 @@ inline std::string to_byte_string(const std::wstring& input)
 	return converter.to_bytes(input);
 }
 
-int GetRealPrintLength(const string &str){
-	auto wstr = to_wide_string(str);
-	int full_count = 0;
-	for(auto &wc : wstr){
-		if(wc < 0 || wc >= 128)
-			full_count += 1;
-	}
-	return wstr.length() + full_count;
-}
-
 int GetRealPrintLength(const wstring &str){
 	int full_count = 0;
 	for(auto &wc : str){
@@ -206,6 +196,52 @@ int GetRealPrintLength(const wstring &str){
 			full_count += 1;
 	}
 	return str.length() + full_count;
+}
+
+wstring GetStrByReal(const wstring &str, int real_start){
+	int length = 0;
+	int start = 0;
+	for(auto &wc : str){
+		length++;
+		if(wc < 0 || wc >= 128)
+			length ++;
+		if(length >= real_start){
+			break;
+			start ++;
+		}
+		start ++;
+	}
+	return str.substr(start);
+}
+
+int GetFullCharSize(const wstring &str, int max_length){
+	int size = 0;
+	int length = 0;
+	for(auto &wc : str){
+		length ++;
+		if(wc < 0 || wc >= 128){
+			size++;
+			length ++;
+		}
+		if(length >= max_length)
+			break;
+	}
+	return size;
+}
+
+void MoveSplitToFitWChar(const wstring &str, int &split){
+	int length = 0;
+	for(auto &wc : str){
+		length++;
+		if(wc < 0 || wc >= 128)
+			length ++;
+		if(length == split) // not need to process
+			break;
+		if(length > split){ // exceed length, split in middle of char
+			split --;
+			break;
+		}
+	}
 }
 
 

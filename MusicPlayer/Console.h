@@ -55,28 +55,26 @@ void Printstring(const wchar_t* str, short x, short y, size_t length, Color colo
 void Printstring(const wchar_t* str, short x, short y, int split, Color color1, Color color2)
 {
 	int attr1 = GetColorAttr(color1);
-	attron(attr1);
-	mvaddnwstr(y, x, str, split);
-	attroff(attr1);
-
 	int attr2 = GetColorAttr(color2);
+
 	attron(attr2);
-	mvaddwstr(y, x + split, str + split);
+	mvaddwstr(y, x, str);
 	attroff(attr2);
+
+	mvchgat(y, x, split, attr1, (color1 <= 7 ? color1 : color1 - 8), NULL);
 }
 
 //在控制台的x,y处输出一个宽字符串，前面的字符显示为color1的颜色，从第split个字符开始显示为color2的颜色。同时指定最大长度为length
 void Printstring(const wchar_t* str, short x, short y, size_t length, int split, Color color1, Color color2)
 {
 	int attr1 = GetColorAttr(color1);
-	attron(attr1);
-	mvaddnwstr(y, x, str, split);
-	attroff(attr1);
-
 	int attr2 = GetColorAttr(color2);
+
 	attron(attr2);
-	mvaddnwstr(y, x + split, str + split, length - split);
+	mvaddnwstr(y, x, str, length);
 	attroff(attr2);
+	
+	mvchgat(y, x , split, attr1, (color2 <= 7 ? color2 : color2 - 8), NULL);
 }
 
 //清除控制台的x,y处开始的length个字符

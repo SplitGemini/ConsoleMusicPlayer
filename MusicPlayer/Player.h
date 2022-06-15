@@ -539,19 +539,20 @@ void CPlayer::ShowLyricsSingleLine() const
 	{
 		static wstring last_lyric;
 		wstring current_lyric{ m_Lyrics.GetLyric(m_current_position, 0) };		//获取当前歌词
+		auto length = GetRealPrintLength(current_lyric);
 		if (current_lyric != last_lyric)
 		{
 			last_lyric = current_lyric;
 			ClearString(0, 3, m_width);				//只有当前歌词变了才要清除歌词显示区域
 		}
 		wstring temp;
-		int lyric_progress{ static_cast<int>(m_Lyrics.GetLyricProgress(m_current_position)*(current_lyric.length() + 1) / 1000) };
+		int lyric_progress{ static_cast<int>(m_Lyrics.GetLyricProgress(m_current_position)*(length + 1) / 1000) };
 		/*lyric_progress为当前歌词的进度所在的字符数，根据GetLyricProgress函数获得的歌词进度和当前歌词的长度计算得到，
 		用于以卡拉OK形式显示歌词*/
 		int lrc_start, lrc_start_half_width;		//当前歌词从第几个字符开始显示（用于当歌词文本超过指定长度时）
-		int x{ static_cast<int>(m_width/2 - current_lyric.length()/2) };		//x为输出歌词文本的x位置（用于实现歌词居中显示）
+		int x{ static_cast<int>(m_width/2 - length/2) };		//x为输出歌词文本的x位置（用于实现歌词居中显示）
 		if (x < 0) x = 0;
-		if (current_lyric.length() <= m_width)
+		if (length <= m_width)
 		{
 			Printstring(current_lyric.c_str(), x, 3, lyric_progress, CYAN, DARK_CYAN);
 		}
@@ -566,7 +567,7 @@ void CPlayer::ShowLyricsSingleLine() const
 			else		//当前歌词进度大于等于控制台宽度一半时，需要计算当前歌词从第几个字符开始显示
 			{
 				lrc_start = lyric_progress - m_width / 2;
-				if (lrc_start > current_lyric.length() - m_width) lrc_start = current_lyric.length() - m_width;
+				if (lrc_start > length - m_width) lrc_start = length - m_width;
 				lrc_start_half_width = lrc_start;
 				if (lrc_start < 0) lrc_start = 0;
 			}
@@ -615,35 +616,43 @@ void CPlayer::ShowLyricsMultiLine(bool force_refresh) const
 			if (i != 0)		//不是当前歌词，以暗色显示
 			{
 				if (lyric_change_flag || force_refresh)			//不是当前歌词只有当前歌词变化了或参数要求强制刷新时才刷新，以避免反复刷新歌词，减少闪烁
-					Printstring(lyric_text.c_str(), lyric_x, y + lyric_hight / 2 + i, lyric_width, DARK_CYAN);
+					Printstring(lyric_text.c_str(), lyric_x, y + lyric_hight / 2 + i, lyric_width - GetFullCharSize(lyric_text, lyric_width), DARK_CYAN);
 			}
 			else		//i=0时为当前歌词
 			{
 				int lyric_progress{ static_cast<int>(m_Lyrics.GetLyricProgress(m_current_position)*(lyric_length + 1) / 1000) };		//歌词进度
-				int lrc_start, lrc_start_half_width;
 				if (lyric_length <= lyric_width)		//当前歌词宽度小于歌词显示宽度时直接显示
 				{
 					Printstring(lyric_text.c_str(), lyric_x, y + lyric_hight / 2 + i, lyric_progress, CYAN, DARK_CYAN);
 				}
 				else		//当前歌词宽度大于歌词显示宽度时滚动显示
 				{
+					int lrc_start, split;
 					lyric_text.append(L" ");		//在歌词末尾加上一个空格，用于解决有时歌词最后一个字符无法显示的问题
 					wstring temp;
-					if (lyric_progress < lyric_width / 2)		//当前歌词进度小于歌词显示宽度一半时，当前歌词从第0个字符开始显示
+					auto half_lyric_width = lyric_width / 2;
+					if (lyric_progress < half_lyric_width)		//当前歌词进度小于歌词显示宽度一半时，当前歌词从第0个字符开始显示
 					{
 						lrc_start = 0;
-						lrc_start_half_width = 0;
+						split = lyric_progress;
 					}
 					else		//当前歌词进度大于等于控制台宽度一半时，需要计算当前歌词从第几个字符开始显示
 					{
-						lrc_start = lyric_progress - lyric_width / 2;
-						if (lrc_start > lyric_length - lyric_width) lrc_start = lyric_length - lyric_width;
-						lrc_start_half_width = lrc_start;
+						if(lyric_length - lyric_progress > half_lyric_width) {
+							lrc_start = lyric_progress - half_lyric_width;
+							split = half_lyric_width;
+						}
+						else { // lyric_length - lyric_progress < lyric_width
+							lrc_start = lyric_length - lyric_width + 1;
+							split = lyric_width - (lyric_length - lyric_progress);
+						}
+
 					}
 					if (lrc_start < 0) lrc_start = 0;
 					
-					temp = lyric_text.substr(lrc_start, lyric_width);
-					Printstring(temp.c_str(), lyric_x, y + lyric_hight / 2 + i, lyric_width, lyric_progress - lrc_start_half_width, CYAN, DARK_CYAN);
+					temp = GetStrByReal(lyric_text, lrc_start);
+					MoveSplitToFitWChar(temp, split);
+					Printstring(temp.c_str(), lyric_x, y + lyric_hight / 2 + i, lyric_width - GetFullCharSize(temp, lyric_width) - lyric_x, split, CYAN, DARK_CYAN);
 				}
 			}
 		}
@@ -898,7 +907,6 @@ void CPlayer::SetTrack()
 	refresh();
 	do
 	{
-		GotoXY(10, 5);
 		char b[256] = {0};
 		getnstr(b, 256);
 		if(b[0] == '\0') continue;

@@ -207,7 +207,7 @@ void CPlayer::IniPlayList(bool cmd_para)
 	clear();
 	//获取播放列表中每一首歌曲的长度
 	wchar_t buff[128] = {0};
-	swprintf(buff, sizeof(buff), L"找到%d首歌曲，正在生成播放列表，请稍候……", m_song_num);
+	swprintf(buff, 128, L"找到%d首歌曲，正在生成播放列表，请稍候……", m_song_num);
 	Printstring(buff, 0, 0, DARK_WHITE);
 	refresh();
 	m_all_song_length.clear();
@@ -407,7 +407,7 @@ void CPlayer::ShowInfo() const
 	ClearString(14, 0, song_name_length);		//清除标题处的字符
 	//显示正在播放的歌曲序号
 	wchar_t buff[128];
-	swprintf(buff, sizeof(buff), L"%.3d", m_index + 1);
+	swprintf(buff, 128, L"%.3d", m_index + 1);
 	Printstring(buff, 10, 0, DARK_CYAN);
 	//显示正在播放的歌曲名称
 	wstring temp;
@@ -430,7 +430,7 @@ void CPlayer::ShowInfo() const
 			name_start = 0;
 		Printstring(temp.c_str(), 14, 0, song_name_length, CYAN);
 	}
-	swprintf(buff, sizeof(buff), L"音量：%d", m_volume);
+	swprintf(buff, 128, L"音量：%d", m_volume);
 	ClearString(m_width - 3, 0, 3);
 	Printstring(buff, m_width - GetRealPrintLength(buff), 0, RED);
 
@@ -450,7 +450,7 @@ void CPlayer::ShowInfo() const
 	default: break;
 	}
 
-	swprintf(buff, sizeof(buff), L"MusicPlayer V%s 作者：ZY", VERSION);
+	swprintf(buff, 128, L"MusicPlayer V%s 作者：ZY", VERSION);
 	Printstring(buff, 0, m_hight - 1,m_width - 37, GRAY);
 }
 
@@ -478,7 +478,7 @@ void CPlayer::ShowProgressBar() const
 
 	//显示歌曲时间
 	wchar_t buff[15];
-	swprintf(buff, sizeof(buff), L"%d:%.2d/%d:%.2d", m_current_position.min, m_current_position.sec, m_song_length.min, m_song_length.sec);
+	swprintf(buff, 15, L"%d:%.2d/%d:%.2d", m_current_position.min, m_current_position.sec, m_song_length.min, m_song_length.sec);
 	ClearString(m_width - 12, 2, 12);
 	Printstring(buff, m_width - 12, 2, DARK_YELLOW);
 }
@@ -490,7 +490,7 @@ void CPlayer::ShowPlaylist() const
 	playlist_width = m_width < WIDTH_THRESHOLD ? m_width : (m_width / 2 - 1);
 	wchar_t buff[64];
 	Printstring(L"播放列表", x, y, GREEN);
-	swprintf(buff, sizeof(buff), L"(共%d首)：", m_song_num);
+	swprintf(buff, 64, L"(共%d首)：", m_song_num);
 	Printstring(buff, x + 8, y, GREEN);
 	Printstring(L"当前路径：", x, y + 1, GRAY);
 	Printstring(m_path.c_str(), x + 10, y + 1, playlist_width - 10, GRAY);		//路径最多显示playlist_width - 10个字符
@@ -507,7 +507,7 @@ void CPlayer::ShowPlaylist() const
 		{
 			PrintInt(index + 1, x + 2, y + 2 + i, GRAY);		//输出序号
 			Printstring(m_playlist[index].c_str(), x + 6, y + 2 + i, playlist_width - 13, WHITE);		//输出文件名（最多只输出playlist_width - 13个字符）
-			swprintf(buff, sizeof(buff), L"%d:%.2d", m_all_song_length[index].min, m_all_song_length[index].sec);
+			swprintf(buff, 64, L"%d:%.2d", m_all_song_length[index].min, m_all_song_length[index].sec);
 			if (m_all_song_length[index] > Time{0, 0, 0})
 				Printstring(buff, m_width - 6, y + 2 + i, DARK_YELLOW);		//输出音频文件长度
 			else
@@ -515,7 +515,7 @@ void CPlayer::ShowPlaylist() const
 		}
 	}
 	//Printstring("按[]翻页", m_width - 14, m_hight - 1, DARK_CYAN);
-	swprintf(buff, sizeof(buff), L"按[]翻页 %d/%d", m_display_page, m_total_page);
+	swprintf(buff, 64, L"按[]翻页 %d/%d", m_display_page, m_total_page);
 	Printstring(buff, m_total_page > 99 ? m_width - 16 : m_width - 14, m_hight - 1, DARK_CYAN);
 
 	if (!m_Lyrics.IsEmpty())
@@ -795,7 +795,7 @@ void CPlayer::SetPath()
 
 	while (true)
 	{
-		swprintf(buff, sizeof(buff), L"共%d个", static_cast<int>(m_recent_path.size()));
+		swprintf(buff, 256, L"共%d个", static_cast<int>(m_recent_path.size()));
 		Printstring(buff, 9, y, DARK_WHITE);
 		max_selection = m_recent_path.size() + 1;
 		if (max_selection > hight - 3) max_selection = hight - 3;
@@ -813,7 +813,7 @@ void CPlayer::SetPath()
 			else
 			{
 				PrintInt(i, x + 2, y + 2 + i, DARK_YELLOW);		//输出序号
-				swprintf(buff, sizeof(buff), L"%s (播放到第%d首)", std::get<PATH>(m_recent_path[i - 1]).c_str(), std::get<TRACK>(m_recent_path[i - 1]) + 1);
+				swprintf(buff, 256, L"%s (播放到第%d首)", std::get<PATH>(m_recent_path[i - 1]).c_str(), std::get<TRACK>(m_recent_path[i - 1]) + 1);
 				size_t path_length{ std::get<PATH>(m_recent_path[i - 1]).length()};	//路径字符串占的半角字符数
 				Printstring(buff, x + 5, y + 2 + i, m_width - 5, path_length, YELLOW, GRAY);
 			}
@@ -1072,13 +1072,13 @@ void CPlayer::Find()
 			if (find_flag)
 			{
 				Printstring(L"查找结果：", x, y + 2, GREEN);
-				swprintf(buff, sizeof(buff), L"(共%d个结果)", static_cast<int>(m_find_result.size()));
+				swprintf(buff, 256, L"(共%d个结果)", static_cast<int>(m_find_result.size()));
 				Printstring(buff, x + 10, y + 2, GRAY);
 			}
 			else
 			{
 				Printstring(L"上次的查找结果：", x, y + 2, GREEN);
-				swprintf(buff, sizeof(buff), L"(共%d个结果)", static_cast<int>(m_find_result.size()));
+				swprintf(buff, 256, L"(共%d个结果)", static_cast<int>(m_find_result.size()));
 				Printstring(buff, x + 16, y + 2, GRAY);
 			}
 			for (int i{ 0 }; i < max_selection; i++)
@@ -1091,7 +1091,7 @@ void CPlayer::Find()
 				//查找结果显示格式为：序号 文件名 (分/秒)
 				PrintInt(i + 1, x + 2, y + 3 + i, GRAY);
 				// FIXME: c_str() 只能取到第一个字符，后面的都被 '\0' 切掉了
-				swprintf(buff, sizeof(buff), L"%s (%d:%.2d)", m_playlist[m_find_result[i]].c_str(), m_all_song_length[m_find_result[i]].min, m_all_song_length[m_find_result[i]].sec);
+				swprintf(buff, 256, L"%s (%d:%.2d)", m_playlist[m_find_result[i]].c_str(), m_all_song_length[m_find_result[i]].min, m_all_song_length[m_find_result[i]].sec);
 				Printstring(buff, x + 5, y + 3 + i, m_width - 5, m_playlist[m_find_result[i]].length(), WHITE, DARK_YELLOW);
 			}
 		}
